@@ -11,13 +11,15 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **
 
 Sections marked **CRITICAL** are mandatory execution gates. They are not recommendations. If a CRITICAL gate is skipped or violated, the agent **MUST** stop the browser task, return to the unmet gate, and complete it before continuing. Work performed beyond a skipped gate **MUST NOT** be treated as valid verification.
 
-## REQUIRED: Tool Invocation
+## REQUIRED: REPL Tools
 
-All REPL controls are native OpenCode tools. The agent **MUST** call them directly and **MUST NOT** wrap them in `execute`, `tools.repl_node`, a string, or a template literal.
+`repl_node`, `repl_job`, and `repl_reset` are direct OpenCode tools.
 
-* Run each cell with `repl_node({ code: 'plain Node.js source' })`.
-* Manage active and retained jobs with `repl_job({ action: 'status', id: '<job-id>' })`, `cancel`, or `stdin`.
-* Reset with `repl_reset({ language: 'node' })` only when losing bindings and browser handles is acceptable.
+The agent **MUST** invoke these tools directly through the tool interface. The agent **MUST NOT** use `execute` to discover, invoke, or wrap them.
+
+For `repl_node`, pass Node.js or TypeScript source in its `code` argument. For multiline or template-heavy source, the agent **SHOULD** pass `code` as an array of source lines.
+
+Use `repl_job` to inspect, cancel, or provide stdin to a retained job. Use `repl_reset` only when losing bindings and browser handles is acceptable.
 
 ## Startup
 
@@ -112,7 +114,7 @@ If the setup cell returns an active job, the agent **MUST** use `repl_job` with 
 
 ### REQUIRED: Sequential REPL Calls
 
-The agent **MUST** send each browser REPL cell as plain JavaScript in the `code` input of a direct `repl_node` call. The plugin executes every cell in the same persistent Node Cell.
+The agent **MUST** send each browser REPL cell as plain JavaScript in the `code` input of a direct `repl_node` tool call. The plugin executes every cell in the same persistent Node Cell.
 
 Browser startup, inspection, and interaction cells do not need an inner tool call.
 
