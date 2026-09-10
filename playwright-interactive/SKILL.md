@@ -17,7 +17,7 @@ Sections marked **CRITICAL** are mandatory execution gates. They are not recomme
 
 The agent **MUST** invoke these tools directly through the tool interface. The agent **MUST NOT** use `execute` to discover, invoke, or wrap them.
 
-For `repl_node`, pass Node.js or TypeScript source in its `code` argument. For multiline or template-heavy source, the agent **SHOULD** pass `code` as an array of source lines.
+For `repl_node`, pass Node.js or TypeScript source directly in its `code` argument.
 
 Use `repl_job` to inspect, cancel, or provide stdin to a retained job. Use `repl_reset` only when losing bindings and browser handles is acceptable.
 
@@ -97,7 +97,6 @@ var playwrightRequire = createRequire(
 )
 
 var HUMANIZED_INPUT_PATH = path.join(SKILL_BASE, 'scripts', 'humanized-input.mjs')
-var SCREENSHOT_PATH = path.join(os.tmpdir(), `opencode-playwright-${process.pid}.png`)
 
 if (!fs.existsSync(HUMANIZED_INPUT_PATH)) {
   throw new Error(`Humanized input helper is missing: ${HUMANIZED_INPUT_PATH}`)
@@ -222,6 +221,7 @@ The persistent Node Cell uses Node's built-in REPL evaluator, transpiles each sn
 * **Use `require()` for modules.** REPL snippets are transpiled as CommonJS. Use `require()` for Node built-ins and workspace packages, `playwrightRequire()` for packages in the shared Playwright runtime, and an absolute path for the skill's synchronous `.mjs` helper module. Do not rely on static import declarations or dynamic `import()` semantics in REPL cells.
 * **Respect Node's module cache.** Loaded modules are cached and are not automatically invalidated when a file changes. Reset the Node Cell before expecting an edited module to execute again, then rerun the runtime setup and the complete startup block.
 * **It is a Node Cell, not a browser.** `location`, `document`, `window`, `navigator`, and `localStorage` are not defined. Reach the DOM through Playwright: `await page.evaluate(() => location.href)` or `await page.locator(...)`. Use `os.tmpdir()` and `process.cwd()` for filesystem work, not browser URLs.
+* **Emit screenshots directly.** Use `opencode.emitImage({ bytes: await page.screenshot({ type: 'png' }), mimeType: 'image/png' })` to return a screenshot to the agent without writing a file.
 * **Keep cells small and one-purpose.** A long single-line expression built by concatenation (regexes, nested `map`/`filter`, multiple `=>` arrows) is the main source of `Expected '}' / ']' / ')'` and `missing ) after argument list` parse errors. Split it across lines and statements; the Node Cell preserves bindings between calls, so you do not lose state by splitting.
 
 ## Persistent Profiles
@@ -341,10 +341,10 @@ Do not assume the outcome.
 **CRITICAL:** This mandatory gate **MUST** be the first activity after the first navigation to each remote origin. Before extracting task content, starting the requested workflow, performing the proving pass, or reporting any result, the agent **MUST** complete all of these steps in order:
 
 1. The agent **MUST** wait roughly 1–2 seconds for delayed consent managers, overlays and popup pages to appear.
-2. The agent **MUST** use the capability-detected AI snapshot procedure from **AI-Optimized Element Discovery** as the first DOM inspection, review relevant frames and `context.pages()` with normal Playwright APIs, capture a viewport screenshot to `SCREENSHOT_PATH`, read that image with OpenCode's `read` tool, and visually inspect it. Capturing or reading a screenshot without visually evaluating it **MUST NOT** be treated as satisfying this step. The AI snapshot or other DOM inspection alone **MUST NOT** be used to conclude that no visible interruption exists.
+2. The agent **MUST** use the capability-detected AI snapshot procedure from **AI-Optimized Element Discovery** as the first DOM inspection, review relevant frames and `context.pages()` with normal Playwright APIs, emit a viewport screenshot with `opencode.emitImage({ bytes: await page.screenshot({ type: 'png' }), mimeType: 'image/png' })`, and visually inspect the returned image. Emitting a screenshot without visually evaluating it **MUST NOT** be treated as satisfying this step. The AI snapshot or other DOM inspection alone **MUST NOT** be used to conclude that no visible interruption exists.
 3. If a cookie or consent prompt is visible, the agent **MUST** choose the affirmative control whose meaning is to accept or allow all cookie categories. Its wording and language vary by site, so the agent **MUST** identify it by meaning rather than rely on a fixed label such as `Accept all`. It **MUST NOT** choose a narrower, rejecting or settings option unless the user asks.
 4. The agent **MUST** dismiss every unrelated, benign interruption that has a safe visible dismissal control. This includes newsletter prompts, surveys, promotional modals, chat invitations, interstitials and unrelated popup pages. Controls may mean close, dismiss, cancel, skip, continue without, not now or an equivalent phrase in another language. The agent **MUST** use normal Playwright locators to identify controls and humanized input to activate them. It **MUST NOT** close a popup page until Playwright inspection confirms that the page is unrelated to the requested flow.
-5. In a separate pass, the agent **MUST** reinspect the page and open pages, capture a fresh screenshot to `SCREENSHOT_PATH`, read and visually inspect it, and confirm that each cookie prompt, dismissed overlay and unrelated popup is gone and that the intended workflow page is active. A timed-out dismissal click can still have succeeded when the control removed itself; the agent **MUST** judge success by this verified end state and **MUST NOT** retry blindly.
+5. In a separate pass, the agent **MUST** reinspect the page and open pages, emit a fresh screenshot, visually inspect it, and confirm that each cookie prompt, dismissed overlay and unrelated popup is gone and that the intended workflow page is active. A timed-out dismissal click can still have succeeded when the control removed itself; the agent **MUST** judge success by this verified end state and **MUST NOT** retry blindly.
 
 The gate **MUST NOT** be considered complete while a visible cookie prompt or safely dismissible unrelated interruption remains. If a control cannot be identified confidently or the interruption cannot be dismissed, the agent **MUST** stop and inspect rather than begin the task underneath it.
 
@@ -385,16 +385,17 @@ Available methods are `moveTo`, `click`, `doubleClick`, `hover`, `wheel`, `scrol
 
 The module uses locator bounding boxes and hit testing only to execute pointer input against the Playwright-selected target. It does not search for, reinterpret or replace the locator.
 
-Use direct Playwright methods for lifecycle and inspection:
+Use direct Playwright methods for lifecycle and inspection. Emit screenshots in memory when they must be visually inspected:
 
 ```js
 await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded' })
-await page.screenshot({ path: SCREENSHOT_PATH, type: 'png' })
+await opencode.emitImage({
+  bytes: await page.screenshot({ type: 'png' }),
+  mimeType: 'image/png'
+})
 await page.goBack()
 var pages = context.pages()
 ```
-
-Read `SCREENSHOT_PATH` with OpenCode's `read` tool when the screenshot must be visually inspected.
 
 Humanized typing is intentionally slower. An input cell that exceeds the five-second foreground window continues as a background job; use `repl_job` to inspect or cancel it.
 
