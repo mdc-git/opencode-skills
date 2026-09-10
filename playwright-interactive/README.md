@@ -58,23 +58,32 @@ Install the REPL backend as a global OpenCode package plugin:
 opencode2 plugin add github:mdc-git/opencode-repl-tools
 ```
 
-Then make this repository available as an OpenCode skill source. One global setup is:
+Install the skill at:
+
+```text
+$HOME/.config/opencode/skills/playwright-interactive
+```
+
+One way to copy the current skill from this repository is:
 
 ```sh
-git clone https://github.com/mdc-git/opencode-skills.git \
-  "$HOME/.config/opencode/opencode-skills"
+tmp="$(mktemp -d)"
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/mdc-git/opencode-skills.git \
+  "$tmp/opencode-skills"
+git -C "$tmp/opencode-skills" sparse-checkout set playwright-interactive
+mkdir -p "$HOME/.config/opencode/skills"
+cp -a \
+  "$tmp/opencode-skills/playwright-interactive" \
+  "$HOME/.config/opencode/skills/"
+rm -rf "$tmp"
 ```
 
-Add the checkout to `${HOME}/.config/opencode/opencode.jsonc`:
+The installed entrypoint is:
 
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "skills": ["~/.config/opencode/opencode-skills"]
-}
+```text
+$HOME/.config/opencode/skills/playwright-interactive/SKILL.md
 ```
-
-OpenCode discovers `playwright-interactive/SKILL.md` from that source and advertises the skill to permitted agents. The same directory can also be placed directly under a project `.opencode/skills/` or the global `~/.config/opencode/skills/` directory if you prefer normal skill discovery instead of an explicit source.
 
 ## Use
 
@@ -160,13 +169,13 @@ Remote browsing should be used only where the user is authorized to access and i
 
 ## Update
 
-Update the skill checkout with Git:
+Replace the installed skill directory with the current `playwright-interactive` directory from this repository. The installed location remains:
 
-```sh
-git -C "$HOME/.config/opencode/opencode-skills" pull --ff-only
+```text
+$HOME/.config/opencode/skills/playwright-interactive
 ```
 
-Use OpenCode's plugin commands to inspect and update the REPL backend:
+Use OpenCode's plugin commands to inspect and update the REPL backend separately:
 
 ```sh
 opencode2 plugin check
@@ -175,6 +184,10 @@ opencode2 plugin update
 
 ## Remove
 
-Remove this repository from the configured `skills` sources, or remove the `playwright-interactive` directory from the OpenCode skill discovery path where it is installed.
+Remove the installed skill directory:
+
+```sh
+rm -rf "$HOME/.config/opencode/skills/playwright-interactive"
+```
 
 `opencode-repl-tools` is a separate plugin and can remain installed for other persistent REPL workflows.
