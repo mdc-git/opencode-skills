@@ -58,25 +58,10 @@ Install the REPL backend as a global OpenCode package plugin:
 opencode2 plugin add github:mdc-git/opencode-repl-tools
 ```
 
-Install the skill at:
-
-```text
-$HOME/.config/opencode/skills/playwright-interactive
-```
-
-One way to copy the current skill from this repository is:
+Install the skill directly at `$HOME/.config/opencode/skills/playwright-interactive`:
 
 ```sh
-tmp="$(mktemp -d)"
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/mdc-git/opencode-skills.git \
-  "$tmp/opencode-skills"
-git -C "$tmp/opencode-skills" sparse-checkout set playwright-interactive
-mkdir -p "$HOME/.config/opencode/skills"
-cp -a \
-  "$tmp/opencode-skills/playwright-interactive" \
-  "$HOME/.config/opencode/skills/"
-rm -rf "$tmp"
+d="$HOME/.config/opencode/skills/playwright-interactive"; mkdir -p "$d" && git -C "$d" init -q && git -C "$d" fetch -q --depth=1 --filter=blob:none https://github.com/mdc-git/opencode-skills.git master && git -C "$d" read-tree FETCH_HEAD:playwright-interactive && git -C "$d" checkout-index -af && rm -rf "$d/.git"
 ```
 
 The installed entrypoint is:
@@ -169,10 +154,10 @@ Remote browsing should be used only where the user is authorized to access and i
 
 ## Update
 
-Replace the installed skill directory with the current `playwright-interactive` directory from this repository. The installed location remains:
+Run the install command again to replace the installed skill with the current `playwright-interactive` subtree:
 
-```text
-$HOME/.config/opencode/skills/playwright-interactive
+```sh
+d="$HOME/.config/opencode/skills/playwright-interactive"; rm -rf "$d" && mkdir -p "$d" && git -C "$d" init -q && git -C "$d" fetch -q --depth=1 --filter=blob:none https://github.com/mdc-git/opencode-skills.git master && git -C "$d" read-tree FETCH_HEAD:playwright-interactive && git -C "$d" checkout-index -af && rm -rf "$d/.git"
 ```
 
 Use OpenCode's plugin commands to inspect and update the REPL backend separately:
