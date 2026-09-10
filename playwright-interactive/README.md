@@ -4,6 +4,10 @@
 
 The skill is designed for work that benefits from an actual programmable browser session rather than a fixed menu of browser actions. The agent can inspect the current UI, perform one interaction at a time, verify the result, and keep useful handles alive while the task continues.
 
+<!-- markdownlint-disable-next-line MD033 -->
+
+<video controls src="https://github.com/user-attachments/assets/b015fe51-692f-475b-a8ac-a772695db35e"></video>
+
 See [SKILL.md](./SKILL.md) for the full execution contract.
 
 ## What it supports
