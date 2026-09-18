@@ -258,12 +258,8 @@ var item = page.getByTestId('result-row')
 When multiple matches are expected, narrow them explicitly:
 
 ```js
-var visibleSave = page
-  .getByRole('button', { name: 'Save' })
-  .filter({ visible: true })
-
-var targetRow = page
-  .getByRole('row')
+var visibleSave = page.getByRole('button', { name: 'Save' }).filter({ visible: true })
+var targetRow = page.getByRole('row')
   .filter({ hasText: 'Ada Lovelace' })
   .filter({ has: page.getByRole('button', { name: 'Open' }) })
 ```
@@ -275,12 +271,7 @@ Use `getByRole(..., { description: ... })` when the page distinguishes controls 
 Playwright 1.60 provides `page.ariaSnapshot()` and locator-scoped `ariaSnapshot()`. Use AI mode when an unfamiliar page or region is well represented by accessibility semantics:
 
 ```js
-var uiSnapshot = await page.ariaSnapshot({
-  mode: 'ai',
-  boxes: true,
-  timeout: 5000
-})
-uiSnapshot
+var uiSnapshot = await page.ariaSnapshot({ mode: 'ai', boxes: true, timeout: 5000 })
 ```
 
 AI mode includes accessible roles and names, nested iframe snapshots, ephemeral references such as `[ref=e2]`, and viewport-relative boxes when `boxes: true`.
@@ -289,12 +280,7 @@ Scope snapshots whenever the relevant region is already known:
 
 ```js
 var dialog = page.getByRole('dialog').filter({ visible: true })
-var dialogSnapshot = await dialog.ariaSnapshot({
-  mode: 'ai',
-  boxes: true,
-  timeout: 5000
-})
-dialogSnapshot
+var dialogSnapshot = await dialog.ariaSnapshot({ mode: 'ai', boxes: true, timeout: 5000 })
 ```
 
 Do not treat the ARIA snapshot as proof that a visible element does not exist. When expected content is missing, inspect the screenshot and use normal Playwright locators against the observed UI. On very large pages, `depth` may reduce output, but omitted descendants remain unknown.
@@ -333,10 +319,7 @@ Use `highlight()` to visually confirm a locator in the headed browser:
 
 ```js
 await target.highlight()
-await opencode.emitImage({
-  bytes: await page.screenshot({ type: 'png' }),
-  mimeType: 'image/png'
-})
+await opencode.emitImage({ bytes: await page.screenshot({ type: 'png' }), mimeType: 'image/png' })
 await target.hideHighlight()
 ```
 
@@ -345,10 +328,7 @@ await target.hideHighlight()
 For frame reconnaissance, inspect URLs and names before guessing selectors:
 
 ```js
-page.frames().map((frame) => ({
-  name: frame.name(),
-  url: frame.url()
-}))
+page.frames().map((frame) => ({ name: frame.name(), url: frame.url() }))
 ```
 
 Then use `frameLocator()`, `locator.contentFrame()`, or the frame's own locator APIs. Frame locators are strict. Playwright locators pierce open shadow roots by default; closed shadow roots are not accessible through standard locators.
@@ -488,10 +468,8 @@ For debugging a broken transition, inspect the browser's stored diagnostics befo
 ```js
 var consoleMessages = await page.consoleMessages({ filter: 'since-navigation' })
 var pageErrors = await page.pageErrors({ filter: 'since-navigation' })
-;({
-  console: consoleMessages.slice(-20).map((message) => message.text()),
-  errors: pageErrors.slice(-20).map((error) => String(error))
-})
+;({ console: consoleMessages.slice(-20).map((m) => m.text()),
+    errors: pageErrors.slice(-20).map((e) => String(e)) })
 ```
 
 These diagnostics are especially useful when the UI appears stuck after a click even though the locator and input action succeeded.
