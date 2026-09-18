@@ -234,59 +234,124 @@ A persistent profile may contain credentials, cookies and browsing history. Neve
 
 Use Playwright directly for every element lookup. The humanized input module has no locator, accessibility inventory, frame discovery, overlay discovery, popup handling or tab tracking API.
 
-### REQUIRED: AI-Optimized Element Discovery
+The goal is to reach a stable locator with the least inspection needed. Do not turn every interaction into a full-page accessibility dump.
 
-When the next target is not already known from current, verified evidence, the agent **MUST** capability-detect and use Playwright's AI-optimized ARIA snapshot as its first element-discovery operation. It **MUST** try `ariaSnapshot` first, then `ariaSnapshotJSON` when the first method is unavailable:
+### Fast Locator Workflow
+
+1. **Use current evidence first.** If the user named the control, a previous step established it, or the visible UI already makes it unambiguous, use a user-facing locator directly.
+2. **Scope before searching.** Narrow to the relevant dialog, form, row, card, navigation region or visible subset before inspecting a large page.
+3. **Use the cheapest high-signal locator.** Prefer role/name, label, text, placeholder, alt text, title or test id. Combine and filter locators instead of guessing long CSS selectors.
+4. **Use an AI ARIA snapshot when semantics are the fastest way to understand an unfamiliar region.** It is a semantic projection, not a complete DOM inventory.
+5. **Use visual inspection when semantics are incomplete.** A visibly present control can be absent or poorly named in the accessibility tree because of application markup, canvas rendering, custom widgets or accessibility defects.
+6. **Normalize implementation-detail locators before reusing them.** Playwright 1.60 can convert a working CSS/XPath-style locator into a more resilient public locator with `Locator.normalize()`.
+
+Typical direct locators:
 
 ```js
-var aiSnapshotOptions = { mode: 'ai', boxes: true, timeout: 5000 }
-var uiSnapshot
-if (typeof page.ariaSnapshot === 'function') {
-  uiSnapshot = await page.ariaSnapshot(aiSnapshotOptions)
-} else if (typeof page.ariaSnapshotJSON === 'function') {
-  uiSnapshot = await page.ariaSnapshotJSON(aiSnapshotOptions)
-} else {
-  uiSnapshot = undefined
-}
+var save = page.getByRole('button', { name: 'Save' })
+var email = page.getByLabel('Email')
+var search = page.getByPlaceholder('Search')
+var notice = page.getByText('Payment received', { exact: true })
+var item = page.getByTestId('result-row')
+```
+
+When multiple matches are expected, narrow them explicitly:
+
+```js
+var visibleSave = page
+  .getByRole('button', { name: 'Save' })
+  .filter({ visible: true })
+
+var targetRow = page
+  .getByRole('row')
+  .filter({ hasText: 'Ada Lovelace' })
+  .filter({ has: page.getByRole('button', { name: 'Open' }) })
+```
+
+Use `getByRole(..., { description: ... })` when the page distinguishes controls with accessible descriptions rather than names.
+
+### AI ARIA Snapshots
+
+Playwright 1.60 provides `page.ariaSnapshot()` and locator-scoped `ariaSnapshot()`. Use AI mode when an unfamiliar page or region is well represented by accessibility semantics:
+
+```js
+var uiSnapshot = await page.ariaSnapshot({
+  mode: 'ai',
+  boxes: true,
+  timeout: 5000
+})
 uiSnapshot
 ```
 
-When either method is available, the agent **MUST** inspect its result before trying selectors. AI mode provides roles, accessible names, element references such as `[ref=e2]` in the text format or equivalent `ref` fields in JSON, and nested iframe snapshots. `boxes: true` adds viewport-relative element bounds. This single Playwright-native representation **SHOULD** replace repeated guessed locators, frame-by-frame searches and broad DOM inspection.
+AI mode includes accessible roles and names, nested iframe snapshots, ephemeral references such as `[ref=e2]`, and viewport-relative boxes when `boxes: true`.
 
-The agent **MUST NOT** assume either method exists solely from a remembered Playwright version. If neither method is available, it **MAY** fall back to exact user-facing Playwright locators plus screenshot inspection and **MUST NOT** recreate an accessibility inventory with custom DOM scripts.
+Scope snapshots whenever the relevant region is already known:
 
-When the snapshot identifies the intended element by reference, the agent **MAY** use that reference immediately for exploratory targeting:
+```js
+var dialog = page.getByRole('dialog').filter({ visible: true })
+var dialogSnapshot = await dialog.ariaSnapshot({
+  mode: 'ai',
+  boxes: true,
+  timeout: 5000
+})
+dialogSnapshot
+```
+
+Do not treat the ARIA snapshot as proof that a visible element does not exist. When expected content is missing, inspect the screenshot and use normal Playwright locators against the observed UI. On very large pages, `depth` may reduce output, but omitted descendants remain unknown.
+
+An `aria-ref` from the current snapshot may be used for immediate exploratory targeting:
 
 ```js
 var target = page.locator('aria-ref=e2')
 ```
 
-`aria-ref` is an implementation-backed, ephemeral selector rather than a documented durable selector API. The agent **MUST** use it in the frame that owns the referenced element and **MUST NOT** persist it in reusable automation. It **SHOULD** derive durable interactions from the observed role, label, text or test id using public locators such as `getByRole()` or `getByLabel()`.
+The reference is ephemeral. Use it only in the owning frame and current UI state, never guess one, and do not persist it in reusable automation. Derive a durable public locator from the observed role, label, text or test id before consolidating the flow.
 
-ARIA references are tied to the most recent snapshot and current UI state. After another snapshot in that frame, navigation or a material DOM change, the agent **MUST** take a fresh snapshot before using a reference. It **MUST NOT** guess an `aria-ref` value.
+### Fast Inspection Tools
 
-If the relevant region is already known, the agent **SHOULD** scope the snapshot to that Playwright locator to reduce output:
+Use Playwright's own locator and page diagnostics before writing custom DOM inventory scripts.
 
-```js
-var dialog = page.getByRole('dialog')
-var dialogSnapshot =
-  typeof dialog.ariaSnapshot === 'function'
-    ? await dialog.ariaSnapshot(aiSnapshotOptions)
-    : typeof dialog.ariaSnapshotJSON === 'function'
-      ? await dialog.ariaSnapshotJSON(aiSnapshotOptions)
-      : undefined
-```
-
-On exceptionally large pages, the agent **MAY** use `depth` to bound a snapshot, but **MUST NOT** conclude that an element is absent when it may have been excluded by that depth. If the AI snapshot does not expose a visibly present control, the agent **MUST** inspect the screenshot and then use normal Playwright locators against the observed UI. An exact user-facing locator already established by current evidence **MAY** be used directly without another snapshot.
-
-Prefer Playwright's user-facing locators:
+If a CSS or XPath locator was necessary to find an awkward element, normalize it:
 
 ```js
-var submit = page.getByRole('button', { name: 'Submit' })
-var email = page.getByLabel('Email')
+var rough = page.locator('[data-widget="checkout"] button.primary')
+var durable = await rough.normalize()
+durable.toString()
 ```
 
-Playwright locators pierce open shadow roots by default. Use `frameLocator()` or a frame's own locator APIs for iframes. Use normal Playwright inspection and screenshots to identify overlays. Closed shadow roots are not accessible through standard Playwright locators.
+When a locator is ambiguous, inspect count and a small amount of text instead of dumping the whole DOM:
+
+```js
+var candidates = page.getByRole('button').filter({ visible: true })
+;({
+  count: await candidates.count(),
+  labels: (await candidates.allInnerTexts()).slice(0, 20)
+})
+```
+
+Use `highlight()` to visually confirm a locator in the headed browser:
+
+```js
+await target.highlight()
+await opencode.emitImage({
+  bytes: await page.screenshot({ type: 'png' }),
+  mimeType: 'image/png'
+})
+await target.hideHighlight()
+```
+
+`page.pickLocator()` is useful when the user is actively co-piloting the headed browser and can click the desired element. It returns Playwright's locator for the picked element. Do not use it as an unattended automation primitive because it waits for a human click.
+
+For frame reconnaissance, inspect URLs and names before guessing selectors:
+
+```js
+page.frames().map((frame) => ({
+  name: frame.name(),
+  url: frame.url()
+}))
+```
+
+Then use `frameLocator()`, `locator.contentFrame()`, or the frame's own locator APIs. Frame locators are strict. Playwright locators pierce open shadow roots by default; closed shadow roots are not accessible through standard locators.
 
 ### REQUIRED: Camoufox Additional Pages
 
@@ -322,8 +387,12 @@ When an action may either navigate the current page or open a new one, compare P
 ```js
 var pagesBefore = new Set(context.pages())
 var urlBefore = page.url()
+var pageEvent = context.waitForEvent('page', { timeout: 1500 }).catch(() => undefined)
 await input.click(page, navigationLocator)
-await page.waitForTimeout(500)
+var openedPage = await pageEvent
+if (!openedPage) {
+  await page.waitForURL((url) => url.href !== urlBefore, { timeout: 1500 }).catch(() => {})
+}
 var openedPages = context.pages().filter((candidate) => !pagesBefore.has(candidate))
 var navigationKind = openedPages.length
   ? 'new-page'
@@ -341,7 +410,7 @@ Do not assume the outcome.
 **CRITICAL:** This mandatory gate **MUST** be the first activity after the first navigation to each remote origin. Before extracting task content, starting the requested workflow, performing the proving pass, or reporting any result, the agent **MUST** complete all of these steps in order:
 
 1. The agent **MUST** wait roughly 1–2 seconds for delayed consent managers, overlays and popup pages to appear.
-2. The agent **MUST** use the capability-detected AI snapshot procedure from **AI-Optimized Element Discovery** as the first DOM inspection, review relevant frames and `context.pages()` with normal Playwright APIs, emit a viewport screenshot with `opencode.emitImage({ bytes: await page.screenshot({ type: 'png' }), mimeType: 'image/png' })`, and visually inspect the returned image. Emitting a screenshot without visually evaluating it **MUST NOT** be treated as satisfying this step. The AI snapshot or other DOM inspection alone **MUST NOT** be used to conclude that no visible interruption exists.
+2. The agent **MUST** inspect the visible page with normal Playwright locators and relevant frame/page inventory, using a scoped AI ARIA snapshot when it is useful, then emit a viewport screenshot with `opencode.emitImage({ bytes: await page.screenshot({ type: 'png' }), mimeType: 'image/png' })` and visually inspect the returned image. Emitting a screenshot without visually evaluating it **MUST NOT** be treated as satisfying this step. DOM or ARIA inspection alone **MUST NOT** be used to conclude that no visible interruption exists.
 3. If a cookie or consent prompt is visible, the agent **MUST** choose the affirmative control whose meaning is to accept or allow all cookie categories. Its wording and language vary by site, so the agent **MUST** identify it by meaning rather than rely on a fixed label such as `Accept all`. It **MUST NOT** choose a narrower, rejecting or settings option unless the user asks.
 4. The agent **MUST** dismiss every unrelated, benign interruption that has a safe visible dismissal control. This includes newsletter prompts, surveys, promotional modals, chat invitations, interstitials and unrelated popup pages. Controls may mean close, dismiss, cancel, skip, continue without, not now or an equivalent phrase in another language. The agent **MUST** use normal Playwright locators to identify controls and humanized input to activate them. It **MUST NOT** close a popup page until Playwright inspection confirms that the page is unrelated to the requested flow.
 5. In a separate pass, the agent **MUST** reinspect the page and open pages, emit a fresh screenshot, visually inspect it, and confirm that each cookie prompt, dismissed overlay and unrelated popup is gone and that the intended workflow page is active. A timed-out dismissal click can still have succeeded when the control removed itself; the agent **MUST** judge success by this verified end state and **MUST NOT** retry blindly.
@@ -403,7 +472,29 @@ Humanized typing is intentionally slower. An input cell that exceeds the five-se
 
 Navigate to the user-requested origin and reach later states through visible UI controls. Do not invent deep links, query strings or form endpoints to bypass the UI.
 
-After completing the mandatory remote cleanup gate, check whether the requested information is already present in the DOM. If it is, read it without unnecessary task interaction. When the current state or target is unclear, inspect a screenshot instead of guessing selectors.
+After completing the mandatory remote cleanup gate, check whether the requested information is already present in the DOM. If it is, read it without unnecessary task interaction.
+
+Prefer Playwright's actionability and observable state changes over fixed sleeps. Use the signal that matches the expected result:
+
+- `page.waitForURL()` when the action should change the main-page URL.
+- `page.waitForEvent('popup')` or `context.waitForEvent('page')` when the action should open another page.
+- A locator state such as visible/hidden/enabled, text, value or count when the action updates the current DOM.
+- `page.waitForLoadState('domcontentloaded')` only when a page-level load milestone is actually needed; normal locator actions already auto-wait for actionability.
+
+When the current state or target is unclear, use the fast locator workflow and inspect a screenshot rather than guessing selectors.
+
+For debugging a broken transition, inspect the browser's stored diagnostics before adding retries:
+
+```js
+var consoleMessages = await page.consoleMessages({ filter: 'since-navigation' })
+var pageErrors = await page.pageErrors({ filter: 'since-navigation' })
+;({
+  console: consoleMessages.slice(-20).map((message) => message.text()),
+  errors: pageErrors.slice(-20).map((error) => String(error))
+})
+```
+
+These diagnostics are especially useful when the UI appears stuck after a click even though the locator and input action succeeded.
 
 ## Session Persistence
 
