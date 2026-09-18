@@ -93,9 +93,9 @@ Browser sessions stay open after a task so the visible result can be inspected a
 
 The workflow inspects the current UI before acting, performs consequential interactions incrementally, and verifies the resulting state before continuing.
 
-It prefers Playwright's user-facing locators such as `getByRole()` and `getByLabel()`. When the next target is not already known, the skill uses Playwright's AI-oriented ARIA snapshot when the installed runtime exposes it, then derives durable public locators from the observed UI.
+It uses the shortest reliable discovery path: known user-facing locators first, scoped locator filtering for ambiguous regions, and Playwright's AI-oriented ARIA snapshot when accessibility semantics are the fastest way to understand an unfamiliar page. ARIA snapshots are treated as a semantic view rather than a complete inventory, so visual inspection remains the fallback when custom UI is poorly represented in the accessibility tree.
 
-Playwright handles frames, open shadow roots, popups, tabs, navigation, screenshots, and assertions directly. Detailed locator, snapshot, popup, overlay, and remote-input rules are kept in [SKILL.md](./SKILL.md).
+The workflow also uses Playwright 1.60 features such as locator normalization, visible filtering, locator highlighting, frame inventory, URL/popup synchronization, and stored console/page errors to make navigation and debugging faster. Playwright handles frames, open shadow roots, popups, tabs, navigation, screenshots, and assertions directly. Detailed locator, snapshot, popup, overlay, and remote-input rules are kept in [SKILL.md](./SKILL.md).
 
 ## Screenshots
 
