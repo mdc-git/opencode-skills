@@ -1,6 +1,6 @@
 ---
 name: playwright-interactive
-description: Persistent Playwright browser and Electron QA through repl_node, with optional humanized input for remote websites.
+description: "Inspect and interact with websites or Electron apps through persistent Playwright sessions. Use for browser or Electron QA, navigation, form interaction, visual verification, and multi-step UI workflows; remote websites may use humanized input."
 ---
 
 # Playwright Interactive
@@ -456,10 +456,10 @@ After completing the mandatory remote cleanup gate, check whether the requested 
 
 Prefer Playwright's actionability and observable state changes over fixed sleeps. Use the signal that matches the expected result:
 
-- `page.waitForURL()` when the action should change the main-page URL.
-- `page.waitForEvent('popup')` or `context.waitForEvent('page')` when the action should open another page.
-- A locator state such as visible/hidden/enabled, text, value or count when the action updates the current DOM.
-- `page.waitForLoadState('domcontentloaded')` only when a page-level load milestone is actually needed; normal locator actions already auto-wait for actionability.
+* `page.waitForURL()` when the action should change the main-page URL.
+* `page.waitForEvent('popup')` or `context.waitForEvent('page')` when the action should open another page.
+* A locator state such as visible/hidden/enabled, text, value or count when the action updates the current DOM.
+* `page.waitForLoadState('domcontentloaded')` only when a page-level load milestone is actually needed; normal locator actions already auto-wait for actionability.
 
 When the current state or target is unclear, use the fast locator workflow and inspect a screenshot rather than guessing selectors.
 

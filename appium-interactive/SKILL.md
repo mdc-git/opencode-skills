@@ -1,6 +1,6 @@
 ---
 name: appium-interactive
-description: Persistent Android app inspection and interaction through Appium and WebdriverIO in repl_node. Use for Android UI QA, accessibility-driven element discovery, forms, navigation, scrolling, screenshots, and virtualized lists.
+description: "Inspect and interact with Android apps through Appium and WebdriverIO in the persistent Node REPL. Use for Android UI QA, navigation, forms, scrolling, screenshots, accessibility-driven element discovery, and virtualized lists."
 ---
 
 # Appium Interactive
