@@ -47,10 +47,10 @@ Add the REPL backend to your OpenCode configuration:
 }
 ```
 
-Install this skill at `$HOME/.config/opencode/skills/appium-interactive`:
+Install or update this skill at `$HOME/.config/opencode/skills/appium-interactive`:
 
 ```sh
-d="$HOME/.config/opencode/skills/appium-interactive"; mkdir -p "$d" && git -C "$d" init -q && git -C "$d" fetch -q --depth=1 --filter=blob:none https://github.com/mdc-git/opencode-skills.git master && git -C "$d" read-tree FETCH_HEAD:appium-interactive && git -C "$d" checkout-index -af && rm -rf "$d/.git"
+curl -fsSL https://raw.githubusercontent.com/mdc-git/opencode-skills/refs/heads/master/appium-interactive/install.sh | bash
 ```
 
 The installed skill entrypoint is:
@@ -103,10 +103,10 @@ Use this skill only with devices, emulators, applications, and Appium endpoints 
 
 ## Update
 
-Replace the installed subtree with the current version:
+Run the installer again to update the installed skill:
 
 ```sh
-d="$HOME/.config/opencode/skills/appium-interactive"; rm -rf "$d" && mkdir -p "$d" && git -C "$d" init -q && git -C "$d" fetch -q --depth=1 --filter=blob:none https://github.com/mdc-git/opencode-skills.git master && git -C "$d" read-tree FETCH_HEAD:appium-interactive && git -C "$d" checkout-index -af && rm -rf "$d/.git"
+curl -fsSL https://raw.githubusercontent.com/mdc-git/opencode-skills/refs/heads/master/appium-interactive/install.sh | bash
 ```
 
 Update the REPL backend separately with OpenCode's plugin commands.

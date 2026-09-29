@@ -24,6 +24,6 @@ Additional browser or Android requirements are documented in each skill's `SKILL
 
 ## Use
 
-Install or copy the skill directory you need into an OpenCode skill location, then let OpenCode load its `SKILL.md`.
+Run the installer documented in the skill README, then let OpenCode load its `SKILL.md`.
 
 Each skill is self-contained. Read its `SKILL.md` for runtime setup, safety gates, and the workflow to follow during a task.

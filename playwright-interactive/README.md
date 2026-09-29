@@ -51,10 +51,10 @@ Add the REPL backend to your OpenCode configuration:
 }
 ```
 
-Install this skill at `$HOME/.config/opencode/skills/playwright-interactive`:
+Install or update this skill at `$HOME/.config/opencode/skills/playwright-interactive`:
 
 ```sh
-d="$HOME/.config/opencode/skills/playwright-interactive"; mkdir -p "$d" && git -C "$d" init -q && git -C "$d" fetch -q --depth=1 --filter=blob:none https://github.com/mdc-git/opencode-skills.git master && git -C "$d" read-tree FETCH_HEAD:playwright-interactive && git -C "$d" checkout-index -af && rm -rf "$d/.git"
+curl -fsSL https://raw.githubusercontent.com/mdc-git/opencode-skills/refs/heads/master/playwright-interactive/install.sh | bash
 ```
 
 The installed skill entrypoint is:
@@ -132,10 +132,10 @@ Remote browsing should only be used where the user is authorized to access and i
 
 ## Update
 
-Replace the installed subtree with the current version:
+Run the installer again to update the installed skill:
 
 ```sh
-d="$HOME/.config/opencode/skills/playwright-interactive"; rm -rf "$d" && mkdir -p "$d" && git -C "$d" init -q && git -C "$d" fetch -q --depth=1 --filter=blob:none https://github.com/mdc-git/opencode-skills.git master && git -C "$d" read-tree FETCH_HEAD:playwright-interactive && git -C "$d" checkout-index -af && rm -rf "$d/.git"
+curl -fsSL https://raw.githubusercontent.com/mdc-git/opencode-skills/refs/heads/master/playwright-interactive/install.sh | bash
 ```
 
 Update the REPL backend separately with OpenCode's plugin commands.
