@@ -1,18 +1,11 @@
-async function assertTargetPage(target, currentPage) {
-  if (typeof target.page === 'function' && target.page() !== currentPage) {
+async function validateTarget(target, currentPage, timeout) {
+  if (target.page() !== currentPage) {
     throw new Error('The target locator belongs to a different Playwright page')
   }
-}
 
-async function assertTargetEnabled(target) {
-  if (typeof target.isEnabled === 'function' && !(await target.isEnabled())) {
+  if (!(await target.isEnabled({ timeout }))) {
     throw new Error('The target locator is disabled')
   }
-}
-
-async function validateTarget(target, currentPage) {
-  await assertTargetPage(target, currentPage)
-  await assertTargetEnabled(target)
 }
 
 function isLocatorTarget(target) {
@@ -23,9 +16,7 @@ function isCoordinateTarget(target) {
   return Number.isFinite(target?.x) && Number.isFinite(target?.y)
 }
 
-async function locatorTargetBox(currentPage, target, timeout) {
-  await validateTarget(target, currentPage)
-  await target.scrollIntoViewIfNeeded({ timeout })
+async function locatorTargetBox(target, timeout) {
   const box = await target.boundingBox({ timeout })
   if (!box || box.width <= 0 || box.height <= 0) {
     throw new Error('Humanized input target is not visible')
@@ -34,9 +25,9 @@ async function locatorTargetBox(currentPage, target, timeout) {
   return box
 }
 
-async function targetBox(currentPage, target, timeout) {
+async function targetBox(target, timeout) {
   if (isLocatorTarget(target)) {
-    return locatorTargetBox(currentPage, target, timeout)
+    return locatorTargetBox(target, timeout)
   }
 
   if (isCoordinateTarget(target)) {
@@ -46,22 +37,31 @@ async function targetBox(currentPage, target, timeout) {
   throw new TypeError('Humanized input target must be a Locator or { x, y }')
 }
 
+// Returns the first candidate offset where the target is the topmost element,
+// or a description of the outermost element covering the target's centre.
 async function hitTestCandidates(target, candidates) {
   return target.evaluate((element, points) => {
     const root = element.getRootNode()
     const hitTestRoot = typeof root.elementFromPoint === 'function' ? root : element.ownerDocument
     const rect = element.getBoundingClientRect()
     const labels = element.labels ? [...element.labels] : []
-    return points.find((candidate) => {
-      const offsetX = rect.width * candidate.x
-      const offsetY = rect.height * candidate.y
-      const top = hitTestRoot.elementFromPoint(rect.left + offsetX, rect.top + offsetY)
+    const topAt = (point) => hitTestRoot.elementFromPoint(rect.left + rect.width * point.x, rect.top + rect.height * point.y)
+    const offset = points.find((candidate) => {
+      const top = topAt(candidate)
       return (
         top === element ||
         element.contains(top) ||
         labels.some((label) => top === label || label.contains(top))
       )
     })
+    if (offset) return { offset }
+
+    let cover = topAt({ x: 0.5, y: 0.5 })
+    if (!cover) return { coveredBy: 'nothing hit-testable; the page may be inert behind a modal' }
+    while (cover.parentElement && !cover.parentElement.contains(element)) cover = cover.parentElement
+    const role = cover.getAttribute('role')
+    const label = (cover.getAttribute('aria-label') || cover.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 60)
+    return { coveredBy: `<${cover.localName}${cover.id ? `#${cover.id}` : ''}${role ? ` role=${role}` : ''}> "${label}"` }
   }, candidates)
 }
 
@@ -73,15 +73,15 @@ async function scrollToAlignment(target, alignment) {
 }
 
 async function findHitPoint(target, hitTest) {
-  let offset = await hitTest()
-  if (offset) {
-    return offset
+  let result = await hitTest()
+  if (result.offset) {
+    return result
   }
 
   await scrollToAlignment(target, 'start')
-  offset = await hitTest()
-  if (offset) {
-    return offset
+  result = await hitTest()
+  if (result.offset) {
+    return result
   }
 
   await scrollToAlignment(target, 'end')
@@ -102,9 +102,9 @@ async function clickablePoint(target, point, box) {
     { x: 0.5, y: 0.75 }
   ]
   const hitTest = () => hitTestCandidates(target, candidates)
-  const offset = await findHitPoint(target, hitTest)
+  const { offset, coveredBy } = await findHitPoint(target, hitTest)
   if (!offset) {
-    throw new Error('Humanized input target is obscured')
+    throw new Error(`Humanized input target is obscured by ${coveredBy}`)
   }
 
   const refreshedBox = await target.boundingBox()
@@ -121,4 +121,4 @@ async function clickablePoint(target, point, box) {
   }
 }
 
-export { clickablePoint, targetBox }
+export { clickablePoint, isLocatorTarget, targetBox, validateTarget }

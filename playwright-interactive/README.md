@@ -12,6 +12,7 @@ Use it for local web apps, authorized remote websites, responsive checks, multi-
 ## What it gives you
 
 - Persistent browser state across OpenCode turns
+- Page observation through compact AI accessibility snapshots whose element refs are directly actionable
 - Normal Playwright locators, navigation, assertions, frames, tabs, and screenshots
 - Chromium for local web applications
 - Camoufox through Playwright's Firefox APIs for authorized remote websites
@@ -27,7 +28,7 @@ The detailed execution contract lives in [SKILL.md](./SKILL.md).
 - OpenCode V2
 - [OpenCode REPL Tools](https://github.com/mdc-git/opencode-repl-tools)
 - Node.js 26 or newer
-- `npm`, `npx`, and `flock` available on `PATH`
+- `bun` and `flock` available on `PATH`
 
 The skill currently pins Playwright `1.60.0` and Camoufox `0.12.0`. Its setup script installs the matching browser runtimes into:
 
@@ -51,10 +52,10 @@ Add the REPL backend to your OpenCode configuration:
 }
 ```
 
-Install or update this skill at `$HOME/.config/opencode/skills/playwright-interactive`:
+Install this skill at `$HOME/.config/opencode/skills/playwright-interactive`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mdc-git/opencode-skills/refs/heads/master/playwright-interactive/install.sh | bash
+d="$HOME/.config/opencode/skills/playwright-interactive"; mkdir -p "$d" && git -C "$d" init -q && git -C "$d" fetch -q --depth=1 --filter=blob:none https://github.com/mdc-git/opencode-skills.git master && git -C "$d" read-tree FETCH_HEAD:playwright-interactive && git -C "$d" checkout-index -af && rm -rf "$d/.git"
 ```
 
 The installed skill entrypoint is:
@@ -85,7 +86,9 @@ The skill selects one startup mode for the task:
 | Authorized remote website | Camoufox through Playwright Firefox APIs |
 | Electron application | Playwright Electron launcher |
 
-Local web and Electron tasks use normal Playwright interaction. Remote web tasks add the bundled humanized-input helpers while Playwright remains responsible for browser lifecycle, navigation, locators, frames, tabs, screenshots, waiting, and assertions.
+Local web and Electron tasks use normal Playwright interaction. Remote web tasks add humanized input while Playwright remains responsible for browser lifecycle, navigation, locators, frames, tabs, screenshots, waiting, and assertions.
+
+Humanized `fill` and `type` click the field before replacing or appending text. Off-screen targets are reached with wheel input where possible, including inside scroll containers. Frame targets and scrolling that cannot make progress use a programmatic fallback.
 
 Browser sessions stay open after a task so the visible result can be inspected and later turns can continue from the same state.
 
@@ -93,13 +96,22 @@ Browser sessions stay open after a task so the visible result can be inspected a
 
 The workflow inspects the current UI before acting, performs consequential interactions incrementally, and verifies the resulting state before continuing.
 
-It uses the shortest reliable discovery path: known user-facing locators first, scoped locator filtering for ambiguous regions, and Playwright's AI-oriented ARIA snapshot when accessibility semantics are the fastest way to understand an unfamiliar page. ARIA snapshots are treated as a semantic view rather than a complete inventory, so visual inspection remains the fallback when custom UI is poorly represented in the accessibility tree.
+The agent works from Playwright's AI accessibility snapshot rather than HTML or screenshots. It outlines a page at low depth, narrows to the relevant region or searches the stored tree with the bundled `ariaFind` helper, acts on the snapshot's element refs, and verifies the result with a scoped re-snapshot or locator state. Covered controls are found by hit-testing rather than screenshots, so cookie banners and modals are detected and dismissed through their own snapshot refs. The snapshot is treated as a semantic view rather than a picture, so element screenshots, viewport screenshots and targeted DOM inspection remain escalation steps for overlays, canvas, weak semantics and visual tasks.
 
-The workflow also uses Playwright 1.60 features such as locator normalization, visible filtering, locator highlighting, frame inventory, URL/popup synchronization, and stored console/page errors to make navigation and debugging faster. Playwright handles frames, open shadow roots, popups, tabs, navigation, screenshots, and assertions directly. Detailed locator, snapshot, popup, overlay, and remote-input rules are kept in [SKILL.md](./SKILL.md).
+Playwright handles frames, open shadow roots, popups, tabs, navigation, screenshots, and assertions directly. Detailed snapshot, ref, popup, overlay, and remote-input rules are kept in [SKILL.md](./SKILL.md).
+
+## Bundled scripts
+
+| Script | Provides |
+| --- | --- |
+| `scripts/browser-session.mjs` | `ensureRuntime()`, `openLocal()`, `openRemote()`, `openElectron()`, `openTab()` for Camoufox tabs, and `followAction()` to report whether an action navigated or opened a page |
+| `scripts/observation.mjs` | `observe()` for location, tabs, frames, overlays and a snapshot outline in one call; `findOverlays()` to report which elements cover visible controls; `ariaFind()` to search a stored snapshot; `settle()` to wait until the document stops changing |
+| `scripts/humanized-input.mjs` | Humanized pointer, keyboard and form input for remote web; a covered target's error names the covering element |
+| `scripts/install-playwright.mjs` | Installs or verifies the pinned Playwright and Camoufox runtime with Bun |
 
 ## Screenshots
 
-Screenshots are returned directly from memory:
+When a task needs visual evidence, screenshots are returned directly from memory:
 
 ```js
 await opencode.emitImage({
@@ -132,10 +144,10 @@ Remote browsing should only be used where the user is authorized to access and i
 
 ## Update
 
-Run the installer again to update the installed skill:
+Replace the installed subtree with the current version:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mdc-git/opencode-skills/refs/heads/master/playwright-interactive/install.sh | bash
+d="$HOME/.config/opencode/skills/playwright-interactive"; rm -rf "$d" && mkdir -p "$d" && git -C "$d" init -q && git -C "$d" fetch -q --depth=1 --filter=blob:none https://github.com/mdc-git/opencode-skills.git master && git -C "$d" read-tree FETCH_HEAD:playwright-interactive && git -C "$d" checkout-index -af && rm -rf "$d/.git"
 ```
 
 Update the REPL backend separately with OpenCode's plugin commands.

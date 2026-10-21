@@ -10,12 +10,12 @@ import { spawn } from 'node:child_process'
 const PLAYWRIGHT_VERSION = '1.60.0'
 const CAMOUFOX_VERSION = '0.12.0'
 const SCRIPT_PATH = fileURLToPath(import.meta.url)
-const SKILL_DIR = path.dirname(path.dirname(SCRIPT_PATH))
 const PLAYWRIGHT_CACHE_DIR = path.join(
   process.env.XDG_CACHE_HOME || path.join(process.env.HOME || os.homedir(), '.cache'),
   'opencode',
   'playwright'
 )
+const BIN_DIR = path.join(PLAYWRIGHT_CACHE_DIR, 'node_modules', '.bin')
 const PLAYWRIGHT_BROWSERS_PATH = path.join(PLAYWRIGHT_CACHE_DIR, 'browsers')
 const CAMOUFOX_INSTALL_DIR = path.join(PLAYWRIGHT_CACHE_DIR, 'camoufox')
 const TEMP_DIR = path.join(PLAYWRIGHT_CACHE_DIR, 'tmp')
@@ -25,13 +25,6 @@ const PLAYWRIGHT_HOST_PLATFORM_OVERRIDE =
   (process.platform === 'linux' && process.arch === 'x64' && isUbuntu2604()
     ? 'ubuntu24.04-x64'
     : undefined)
-const REQUIRED_HELPERS = [
-  'humanized-input.mjs',
-  'humanized-input-actions.mjs',
-  'humanized-input-input.mjs',
-  'humanized-input-target.mjs',
-  'humanized-input-utils.mjs'
-]
 
 if (PLAYWRIGHT_HOST_PLATFORM_OVERRIDE) {
   process.env.PLAYWRIGHT_HOST_PLATFORM_OVERRIDE = PLAYWRIGHT_HOST_PLATFORM_OVERRIDE
@@ -102,10 +95,6 @@ function camoufoxReady() {
   return fs.existsSync(path.join(CAMOUFOX_INSTALL_DIR, 'version.json'))
 }
 
-function helpersReady() {
-  return REQUIRED_HELPERS.every((helper) => fs.existsSync(path.join(SKILL_DIR, 'scripts', helper)))
-}
-
 async function install() {
   fs.mkdirSync(TEMP_DIR, { recursive: true })
 
@@ -115,10 +104,13 @@ async function install() {
   }
 
   if (!packagesReady()) {
-    await run('npm', [
-      'install',
-      '--prefix',
+    await run('bun', [
+      'add',
+      '--cwd',
       PLAYWRIGHT_CACHE_DIR,
+      '--linker',
+      'hoisted',
+      '--ignore-scripts',
       `playwright@${PLAYWRIGHT_VERSION}`,
       `camoufox-js@${CAMOUFOX_VERSION}`
     ])
@@ -126,19 +118,15 @@ async function install() {
   }
 
   if (!chromiumReady()) {
-    await run('npx', ['--prefix', PLAYWRIGHT_CACHE_DIR, 'playwright', 'install', 'chromium'])
+    await run(path.join(BIN_DIR, 'playwright'), ['install', 'chromium'])
   }
 
   if (!camoufoxReady()) {
-    await run('npx', ['--prefix', PLAYWRIGHT_CACHE_DIR, 'camoufox-js', 'fetch'])
+    await run(path.join(BIN_DIR, 'camoufox-js'), ['fetch'])
   }
 
   if (!packagesReady() || !chromiumReady() || !camoufoxReady()) {
     throw new Error('Playwright runtime verification failed')
-  }
-
-  if (!helpersReady()) {
-    throw new Error(`Required humanized-input helpers are missing from ${SKILL_DIR}/scripts`)
   }
 
   console.log(`Playwright runtime ready at ${PLAYWRIGHT_CACHE_DIR}`)

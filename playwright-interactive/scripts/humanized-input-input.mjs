@@ -66,9 +66,10 @@ async function typeText(currentPage, text, profile) {
   })
 }
 
-async function performClick({ currentPage, state, target, options, profile, moveToPoint }) {
+async function performClick({ currentPage, state, target, options, profile, moveToPoint, revealTarget }) {
   const { modifiers, button, count = 1, timeout } = options ?? {}
-  const box = await targetBox(currentPage, target, timeout)
+  await revealTarget(currentPage, state, target, timeout)
+  const box = await targetBox(target, timeout)
   const point = pointFor(box, profile)
   await sleep(Math.min(1200, logNormal(profile.actionGapMean, profile.actionGapSigma)))
   await moveToPoint(currentPage, state, point)
@@ -124,11 +125,11 @@ function performClickGesture({ currentPage, state, point, button, count, profile
   )
 }
 
-function createInputHelpers(profile, moveToPoint) {
+function createInputHelpers(profile, moveToPoint, revealTarget) {
   return {
     typeText: (currentPage, text) => typeText(currentPage, text, profile),
     performClick: (currentPage, state, target, options) =>
-      performClick({ currentPage, state, target, options, profile, moveToPoint })
+      performClick({ currentPage, state, target, options, profile, moveToPoint, revealTarget })
   }
 }
 

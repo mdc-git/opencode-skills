@@ -1,6 +1,6 @@
-import { createMoveHelpers, pageViewport } from './humanized-input-actions.mjs'
+import { createMoveHelpers, pageViewport, performWheelSteps } from './humanized-input-actions.mjs'
 import { createInputHelpers } from './humanized-input-input.mjs'
-import { clamp, sleep, uniform } from './humanized-input-utils.mjs'
+import { sleep, uniform } from './humanized-input-utils.mjs'
 
 const DEFAULT_PROFILE = Object.freeze({
   profileId: 'humanized-input',
@@ -33,37 +33,6 @@ function requirePage(currentPage) {
   return currentPage
 }
 
-async function performWheelSteps(currentPage, deltaX, deltaY) {
-  const magnitude = Math.max(Math.abs(deltaX), Math.abs(deltaY))
-  if (magnitude === 0) {
-    return
-  }
-
-  const step = async (remainingX, remainingY, impulse, steps) => {
-    requirePage(currentPage)
-    if (steps >= 24) {
-      await currentPage.mouse.wheel(remainingX, remainingY)
-      return
-    }
-
-    const share = clamp(impulse / Math.max(1, Math.hypot(remainingX, remainingY)), 0.12, 1)
-    const stepX = remainingX * share
-    const stepY = remainingY * share
-    const restX = remainingX - stepX
-    const restY = remainingY - stepY
-    await currentPage.mouse.wheel(stepX, stepY)
-    if (Math.max(Math.abs(restX), Math.abs(restY)) <= 0.5) {
-      return
-    }
-
-    const nextImpulse = impulse * 0.78 * uniform(0.85, 1.1)
-    await sleep(nextImpulse > 90 ? uniform(16, 42) : uniform(55, 110))
-    await step(restX, restY, nextImpulse, steps + 1)
-  }
-
-  await step(deltaX, deltaY, clamp(magnitude * uniform(0.3, 0.5), 48, 360), 0)
-}
-
 function createActionQueue() {
   const stateByPage = new WeakMap()
   const stateFor = (currentPage) => {
@@ -88,16 +57,24 @@ function createActionQueue() {
   return queue
 }
 
-function createPointerVerbs({ queue, moveToTarget, performClick }) {
+function createPointerVerbs({ queue, moveToPoint, moveToTarget, performClick }) {
   const click = (currentPage, target, options = {}, count = 1) =>
     queue(currentPage, (state) => performClick(currentPage, state, target, { ...options, count }))
+  // Camoufox ignores wheel input until the pointer has moved, so an unplaced
+  // pointer first rests near the middle of the viewport.
   const wheel = (currentPage, deltaX, deltaY, target) =>
     queue(currentPage, async (state) => {
       if (target !== undefined) {
         await moveToTarget(currentPage, state, target)
+      } else if (state.x === undefined) {
+        const size = await pageViewport(currentPage)
+        await moveToPoint(currentPage, state, {
+          x: size.width * uniform(0.35, 0.65),
+          y: size.height * uniform(0.35, 0.65)
+        })
       }
 
-      await performWheelSteps(currentPage, deltaX, deltaY)
+      await performWheelSteps(currentPage, deltaX, deltaY, requirePage)
     })
 
   return {
@@ -117,10 +94,7 @@ function createPointerVerbs({ queue, moveToTarget, performClick }) {
         return wheel(currentPage, 0, deltaY, targetOrDelta)
       }
 
-      return queue(currentPage, async (state) => {
-        await targetOrDelta.scrollIntoViewIfNeeded()
-        await moveToTarget(currentPage, state, targetOrDelta)
-      })
+      return queue(currentPage, (state) => moveToTarget(currentPage, state, targetOrDelta))
     },
     dragTo: (currentPage, source, target) =>
       queue(currentPage, async (state) => {
@@ -130,18 +104,17 @@ function createPointerVerbs({ queue, moveToTarget, performClick }) {
   }
 }
 
-function createKeyboardVerbs({ queue, moveToTarget, typeText, profile }) {
+function createKeyboardVerbs({ queue, moveToTarget, performClick, typeText, profile }) {
   return {
     type: (currentPage, target, text) =>
       queue(currentPage, async (state) => {
-        await moveToTarget(currentPage, state, target)
-        await target.focus()
+        await performClick(currentPage, state, target)
+        await currentPage.keyboard.press('ControlOrMeta+End')
         await typeText(currentPage, text)
       }),
     fill: (currentPage, target, text) =>
       queue(currentPage, async (state) => {
-        await moveToTarget(currentPage, state, target)
-        await target.focus()
+        await performClick(currentPage, state, target)
         await currentPage.keyboard.press('ControlOrMeta+A')
         await currentPage.keyboard.press('Backspace')
         await typeText(currentPage, text)
@@ -187,9 +160,9 @@ export function createHumanizedInput({ profile: profileOverrides = {} } = {}) {
   const profile = Object.freeze({ ...DEFAULT_PROFILE, ...profileOverrides })
   const queue = createActionQueue()
 
-  const { moveToPoint, moveToTarget } = createMoveHelpers(profile, pageViewport, requirePage)
-  const { typeText, performClick } = createInputHelpers(profile, moveToPoint)
-  const deps = { queue, moveToTarget, performClick, typeText, profile }
+  const { moveToPoint, moveToTarget, revealTarget } = createMoveHelpers(profile, pageViewport, requirePage)
+  const { typeText, performClick } = createInputHelpers(profile, moveToPoint, revealTarget)
+  const deps = { queue, moveToPoint, moveToTarget, performClick, typeText, profile }
 
   return Object.freeze({
     profile,
