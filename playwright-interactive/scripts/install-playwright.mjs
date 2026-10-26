@@ -7,8 +7,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 
-const PLAYWRIGHT_VERSION = '1.60.0'
-const CAMOUFOX_VERSION = '0.12.0'
+const PLAYWRIGHT_VERSION = '1.62.1'
+const CAMOUFOX_VERSION = '0.13.0'
 const SCRIPT_PATH = fileURLToPath(import.meta.url)
 const PLAYWRIGHT_CACHE_DIR = path.join(
   process.env.XDG_CACHE_HOME || path.join(process.env.HOME || os.homedir(), '.cache'),
@@ -81,9 +81,10 @@ function packagesReady() {
   )
 }
 
+const requireFromCache = createRequire(path.join(PLAYWRIGHT_CACHE_DIR, '__playwright__.cjs'))
+
 function chromiumReady() {
   try {
-    const requireFromCache = createRequire(path.join(PLAYWRIGHT_CACHE_DIR, '__playwright__.cjs'))
     const playwright = requireFromCache('playwright')
     return fs.existsSync(playwright.chromium.executablePath())
   } catch {
@@ -91,8 +92,15 @@ function chromiumReady() {
   }
 }
 
+// launchPath() resolves the active Camoufox build and throws, without
+// downloading, when it is missing or unsupported by the installed camoufox-js.
 function camoufoxReady() {
-  return fs.existsSync(path.join(CAMOUFOX_INSTALL_DIR, 'version.json'))
+  try {
+    const pkgman = requireFromCache('camoufox-js/dist/pkgman.js')
+    return fs.existsSync(pkgman.launchPath())
+  } catch {
+    return false
+  }
 }
 
 async function install() {

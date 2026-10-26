@@ -12,12 +12,14 @@ files=(
   README.md
   SKILL.md
   install.sh
+  scripts/browser-session.mjs
   scripts/humanized-input-actions.mjs
   scripts/humanized-input-input.mjs
   scripts/humanized-input-target.mjs
   scripts/humanized-input-utils.mjs
   scripts/humanized-input.mjs
   scripts/install-playwright.mjs
+  scripts/observation.mjs
 )
 
 for file in "${files[@]}"; do

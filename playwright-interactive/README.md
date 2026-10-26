@@ -30,7 +30,7 @@ The detailed execution contract lives in [SKILL.md](./SKILL.md).
 - Node.js 26 or newer
 - `bun` and `flock` available on `PATH`
 
-The skill currently pins Playwright `1.60.0` and Camoufox `0.12.0`. Its setup script installs the matching browser runtimes into:
+The skill currently pins Playwright `1.62.1` and Camoufox `0.13.0`. Its setup script installs the matching browser runtimes into:
 
 ```text
 ${XDG_CACHE_HOME:-$HOME/.cache}/opencode/playwright
